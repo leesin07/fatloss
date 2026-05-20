@@ -13,6 +13,8 @@ import {
   FileText,
   ChevronRight,
   X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -44,6 +46,7 @@ export default function RecordPage() {
   const [plans, setPlans] = useState<MealPlan[]>([]);
   const [newWeight, setNewWeight] = useState<string>('');
   const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
+  const [showAllRecords, setShowAllRecords] = useState<boolean>(false);
 
   useEffect(() => {
     loadData();
@@ -133,14 +136,29 @@ export default function RecordPage() {
     return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
 
+  const formatPlanDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  };
+
   const trend = getTrend();
   const suggestion = getAdjustmentSuggestion();
 
-  // 简单的趋势图数据
+  // 趋势图数据
   const chartData = records.slice(0, 10).reverse();
   const minWeight = Math.min(...chartData.map(r => r.weight)) - 1;
   const maxWeight = Math.max(...chartData.map(r => r.weight)) + 1;
   const weightRange = maxWeight - minWeight || 1;
+
+  // 计算SVG坐标
+  const chartWidth = chartData.length * 50;
+  const chartHeight = 120;
+  const padding = { left: 35, right: 15, top: 20, bottom: 25 };
+  const graphWidth = chartWidth - padding.left - padding.right;
+  const graphHeight = chartHeight - padding.top - padding.bottom;
+
+  const getX = (index: number) => padding.left + (index / (chartData.length - 1 || 1)) * graphWidth;
+  const getY = (weight: number) => padding.top + (1 - (weight - minWeight) / weightRange) * graphHeight;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-background">
@@ -155,12 +173,12 @@ export default function RecordPage() {
         </div>
       </header>
 
-      <main className="container mx-auto max-w-lg px-4 py-6 space-y-6">
+      <main className="container mx-auto max-w-lg px-4 py-6 space-y-5">
         {/* 添加体重记录 */}
         <Card>
           <CardContent className="py-4">
             <h3 className="text-sm font-medium mb-3">记录今日体重</h3>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Input
                 type="number"
                 placeholder="输入体重"
@@ -171,8 +189,8 @@ export default function RecordPage() {
                 max="300"
                 step="0.1"
               />
-              <span className="flex items-center text-muted-foreground">kg</span>
-              <Button onClick={addWeightRecord} disabled={!newWeight} className="h-11">
+              <span className="flex items-center text-muted-foreground text-sm">kg</span>
+              <Button onClick={addWeightRecord} disabled={!newWeight} className="h-11 px-4">
                 记录
               </Button>
             </div>
@@ -183,61 +201,108 @@ export default function RecordPage() {
         {chartData.length >= 2 && (
           <Card>
             <CardContent className="py-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium">体重趋势</h3>
                 {trend && (
-                  <span className={`text-xs flex items-center gap-1 ${
+                  <span className={`text-sm font-medium flex items-center gap-1 ${
                     trend.type === 'down' ? 'text-green-600' : trend.type === 'up' ? 'text-red-500' : 'text-gray-500'
                   }`}>
-                    {trend.type === 'down' && <TrendingDown className="h-3 w-3" />}
-                    {trend.type === 'up' && <TrendingUp className="h-3 w-3" />}
-                    {trend.type === 'stable' && <Minus className="h-3 w-3" />}
+                    {trend.type === 'down' && <TrendingDown className="h-4 w-4" />}
+                    {trend.type === 'up' && <TrendingUp className="h-4 w-4" />}
+                    {trend.type === 'stable' && <Minus className="h-4 w-4" />}
                     {trend.type === 'down' ? '-' : trend.type === 'up' ? '+' : ''}{trend.value}kg
                   </span>
                 )}
               </div>
               
               {/* SVG 趋势图 */}
-              <div className="relative h-32 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-2 overflow-x-auto">
                 <svg
-                  viewBox={`0 0 ${chartData.length * 40} 120`}
-                  className="w-full h-full"
-                  preserveAspectRatio="none"
+                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                  className="w-full"
+                  style={{ minWidth: '280px' }}
+                  preserveAspectRatio="xMidYMid meet"
                 >
+                  {/* Y轴刻度 */}
+                  <text x="8" y={padding.top + 4} className="text-[10px] fill-gray-400">
+                    {maxWeight.toFixed(1)}
+                  </text>
+                  <text x="8" y={chartHeight - padding.bottom + 4} className="text-[10px] fill-gray-400">
+                    {minWeight.toFixed(1)}
+                  </text>
+                  
+                  {/* 网格线 */}
+                  <line
+                    x1={padding.left}
+                    y1={padding.top}
+                    x2={chartWidth - padding.right}
+                    y2={padding.top}
+                    stroke="currentColor"
+                    className="text-gray-200 dark:text-gray-700"
+                    strokeDasharray="4"
+                  />
+                  <line
+                    x1={padding.left}
+                    y1={chartHeight - padding.bottom}
+                    x2={chartWidth - padding.right}
+                    y2={chartHeight - padding.bottom}
+                    stroke="currentColor"
+                    className="text-gray-200 dark:text-gray-700"
+                    strokeDasharray="4"
+                  />
+                  
+                  {/* 趋势区域填充 */}
+                  <polygon
+                    points={`${getX(0)},${chartHeight - padding.bottom} ${chartData.map((r, i) => `${getX(i)},${getY(r.weight)}`).join(' ')} ${getX(chartData.length - 1)},${chartHeight - padding.bottom}`}
+                    fill="url(#gradient)"
+                    opacity="0.3"
+                  />
+                  
+                  {/* 渐变定义 */}
+                  <defs>
+                    <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" />
+                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  
                   {/* 趋势线 */}
                   <polyline
-                    points={chartData.map((r, i) => {
-                      const x = i * 40 + 20;
-                      const y = 110 - ((r.weight - minWeight) / weightRange) * 100;
-                      return `${x},${y}`;
-                    }).join(' ')}
+                    points={chartData.map((r, i) => `${getX(i)},${getY(r.weight)}`).join(' ')}
                     fill="none"
                     stroke="#22c55e"
-                    strokeWidth="2"
+                    strokeWidth="2.5"
                     strokeLinejoin="round"
+                    strokeLinecap="round"
                   />
-                  {/* 数据点 */}
-                  {chartData.map((r, i) => {
-                    const x = i * 40 + 20;
-                    const y = 110 - ((r.weight - minWeight) / weightRange) * 100;
-                    return (
-                      <g key={r.id}>
-                        <circle cx={x} cy={y} r="4" fill="#22c55e" />
-                        <text x={x} y={y - 10} textAnchor="middle" className="text-[10px] fill-gray-500">
-                          {r.weight}
-                        </text>
-                      </g>
-                    );
-                  })}
+                  
+                  {/* 数据点和标签 */}
+                  {chartData.map((r, i) => (
+                    <g key={r.id}>
+                      <circle
+                        cx={getX(i)}
+                        cy={getY(r.weight)}
+                        r="4"
+                        fill="#22c55e"
+                        stroke="white"
+                        strokeWidth="2"
+                      />
+                      <text
+                        x={getX(i)}
+                        y={getY(r.weight) - 10}
+                        textAnchor="middle"
+                        className="text-[10px] font-medium fill-gray-600 dark:fill-gray-300"
+                      >
+                        {r.weight}
+                      </text>
+                    </g>
+                  ))}
                 </svg>
-                {/* Y轴标签 */}
-                <div className="absolute top-2 right-2 text-[10px] text-muted-foreground">
-                  {maxWeight.toFixed(1)}kg
-                </div>
-                <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground">
-                  {minWeight.toFixed(1)}kg
-                </div>
               </div>
+              
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                最近 {chartData.length} 次记录
+              </p>
             </CardContent>
           </Card>
         )}
@@ -245,15 +310,15 @@ export default function RecordPage() {
         {/* 调整建议 */}
         {suggestion && (
           <Card className={`${
-            suggestion.type === 'good' ? 'border-green-200 dark:border-green-800' :
-            suggestion.type === 'warning' ? 'border-orange-200 dark:border-orange-800' :
-            'border-gray-200 dark:border-gray-800'
+            suggestion.type === 'good' ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30' :
+            suggestion.type === 'warning' ? 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30' :
+            'border-gray-200'
           }`}>
             <CardContent className="py-4">
-              <h3 className="text-sm font-medium mb-2">调整建议</h3>
+              <h3 className="text-sm font-medium mb-2">💡 调整建议</h3>
               <p className={`text-sm ${
-                suggestion.type === 'good' ? 'text-green-600 dark:text-green-400' :
-                suggestion.type === 'warning' ? 'text-orange-600 dark:text-orange-400' :
+                suggestion.type === 'good' ? 'text-green-700 dark:text-green-400' :
+                suggestion.type === 'warning' ? 'text-orange-700 dark:text-orange-400' :
                 'text-muted-foreground'
               }`}>
                 {suggestion.text}
@@ -271,38 +336,37 @@ export default function RecordPage() {
                 {plans.slice(0, 5).map((p) => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => setSelectedPlan(p)}
                   >
-                    <div 
-                      className="flex-1 cursor-pointer"
-                      onClick={() => setSelectedPlan(p)}
-                    >
+                    <div className="flex-1">
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium">{p.weight}kg</span>
+                        <span className="font-semibold">{p.weight}kg</span>
                         <span className="text-xs text-muted-foreground">
-                          {formatDate(p.date)}
+                          {formatPlanDate(p.date)}
                         </span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          p.format === 'raw' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          p.format === 'raw' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
                         }`}>
                           {p.format === 'raw' ? '生重' : '熟重'}
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        碳水{p.carbs}g · 蛋白{p.protein}g · 脂肪{p.fat}g
+                        碳水 {p.carbs}g · 蛋白 {p.protein}g · 脂肪 {p.fat}g
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={(e) => {
                           e.stopPropagation();
                           deletePlan(p.id);
                         }}
                       >
-                        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                       </Button>
                     </div>
                   </div>
@@ -316,9 +380,18 @@ export default function RecordPage() {
         {records.length > 0 && (
           <Card>
             <CardContent className="py-4">
-              <h3 className="text-sm font-medium mb-3">体重记录</h3>
+              <div 
+                className="flex items-center justify-between mb-3 cursor-pointer"
+                onClick={() => setShowAllRecords(!showAllRecords)}
+              >
+                <h3 className="text-sm font-medium">体重记录</h3>
+                <div className="flex items-center text-muted-foreground text-xs">
+                  共 {records.length} 条
+                  {showAllRecords ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </div>
               <div className="space-y-2">
-                {records.slice(0, 10).map((record, index) => {
+                {(showAllRecords ? records : records.slice(0, 5)).map((record, index) => {
                   const prevRecord = records[index + 1];
                   const diff = prevRecord ? (record.weight - prevRecord.weight).toFixed(1) : null;
                   
@@ -333,7 +406,7 @@ export default function RecordPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         {diff && (
-                          <span className={`text-xs ${
+                          <span className={`text-xs font-medium ${
                             parseFloat(diff) < 0 ? 'text-green-600' : 
                             parseFloat(diff) > 0 ? 'text-red-500' : 'text-gray-400'
                           }`}>
@@ -345,10 +418,11 @@ export default function RecordPage() {
                         </span>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-7 w-7"
                           onClick={() => deleteRecord(record.id)}
                         >
-                          <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-500" />
                         </Button>
                       </div>
                     </div>
@@ -361,11 +435,13 @@ export default function RecordPage() {
 
         {/* 空状态 */}
         {records.length === 0 && plans.length === 0 && (
-          <div className="text-center py-12">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">暂无记录</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              去<Link href="/calculator" className="text-green-600 hover:underline">计算摄入量</Link>开始吧
+          <div className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <FileText className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground font-medium">暂无记录</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              去 <Link href="/calculator" className="text-green-600 hover:underline font-medium">计算摄入量</Link> 开始吧
             </p>
           </div>
         )}
@@ -373,45 +449,51 @@ export default function RecordPage() {
 
       {/* 方案详情弹窗 */}
       {selectedPlan && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center">
-          <Card className="w-full max-w-lg max-h-[80vh] overflow-hidden sm:mx-4 rounded-b-none sm:rounded-b-lg">
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center"
+          onClick={() => setSelectedPlan(null)}
+        >
+          <Card 
+            className="w-full max-w-lg max-h-[85vh] overflow-hidden sm:mx-4 rounded-b-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CardContent className="p-0">
               {/* 弹窗头部 */}
-              <div className="sticky top-0 bg-white dark:bg-card border-b p-4 flex items-center justify-between">
+              <div className="sticky top-0 bg-white dark:bg-card border-b px-4 py-3 flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold">饮食方案</h3>
+                  <h3 className="font-semibold text-base">饮食方案</h3>
                   <p className="text-xs text-muted-foreground">
-                    {selectedPlan.weight}kg · {selectedPlan.format === 'raw' ? '生重' : '熟重'} · {formatDate(selectedPlan.date)}
+                    {selectedPlan.weight}kg · {selectedPlan.format === 'raw' ? '生重' : '熟重'} · {formatPlanDate(selectedPlan.date)}
                   </p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedPlan(null)}>
-                  <X className="h-4 w-4" />
+                <Button variant="ghost" size="icon" onClick={() => setSelectedPlan(null)}>
+                  <X className="h-5 w-5" />
                 </Button>
               </div>
               
               {/* 营养素 */}
-              <div className="p-4 border-b bg-gray-50 dark:bg-gray-900">
-                <div className="flex items-center justify-around text-center text-sm">
+              <div className="px-4 py-3 border-b bg-gray-50 dark:bg-gray-900">
+                <div className="flex items-center justify-around text-center">
                   <div>
-                    <span className="font-semibold text-orange-600">{selectedPlan.carbs}g</span>
-                    <span className="text-muted-foreground ml-1">碳水</span>
+                    <span className="font-bold text-orange-600 text-lg">{selectedPlan.carbs}g</span>
+                    <span className="text-muted-foreground text-xs ml-1">碳水</span>
                   </div>
-                  <div className="w-px h-4 bg-border" />
+                  <div className="w-px h-6 bg-border" />
                   <div>
-                    <span className="font-semibold text-red-600">{selectedPlan.protein}g</span>
-                    <span className="text-muted-foreground ml-1">蛋白质</span>
+                    <span className="font-bold text-red-600 text-lg">{selectedPlan.protein}g</span>
+                    <span className="text-muted-foreground text-xs ml-1">蛋白质</span>
                   </div>
-                  <div className="w-px h-4 bg-border" />
+                  <div className="w-px h-6 bg-border" />
                   <div>
-                    <span className="font-semibold text-yellow-600">{selectedPlan.fat}g</span>
-                    <span className="text-muted-foreground ml-1">脂肪</span>
+                    <span className="font-bold text-yellow-600 text-lg">{selectedPlan.fat}g</span>
+                    <span className="text-muted-foreground text-xs ml-1">脂肪</span>
                   </div>
                 </div>
               </div>
               
               {/* 方案内容 */}
-              <div className="p-4 overflow-y-auto max-h-[50vh]">
-                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
+              <div className="p-4 overflow-y-auto max-h-[55vh]">
+                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
                   {selectedPlan.plan}
                 </div>
               </div>
