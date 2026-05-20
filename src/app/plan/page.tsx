@@ -169,7 +169,8 @@ export default function PlanPage() {
   // 解析方案文本，提取每天的数据
   const parsePlan = (text: string): DayPlan[] => {
     const days: DayPlan[] = [];
-    const dayPattern = /第\s*(\d+)\s*天[：:]/g;
+    // 匹配多种格式：第1天：、第1天、📅 第1天
+    const dayPattern = /(?:📅\s*)?第\s*(\d+)\s*天\s*[：:]?/g;
     let match;
     
     const dayPositions: { day: number; start: number }[] = [];
@@ -183,28 +184,38 @@ export default function PlanPage() {
       const dayContent = text.slice(current.start, next?.start);
 
       const parseMeal = (content: string, mealName: string): MealData => {
-        const mealMatch = content.match(new RegExp(`${mealName}[：:]\\s*([\\s\\S]*?)(?=(?:早|午|晚)[餐食]|第\\s*\\d+\\s*天|$)`));
+        // 匹配多种格式：🌅 早餐、早餐：、早餐
+        const mealMatch = content.match(new RegExp(`(?:[🌅🌞🌙]\\s*)?${mealName}\\s*[：:]?\\s*([\\s\\S]*?)(?=(?:[🌅🌞🌙]\\s*)?(?:早|午|晚)餐|(?:📅\\s*)?第\\s*\\d+\\s*天|━|$)`));
         if (!mealMatch) return { name: mealName, calories: 0, foods: [] };
         
         const mealText = mealMatch[1];
         const foods: FoodItem[] = [];
         
-        // 提取食物项
-        const foodPattern = /(?:[-•*]\s*)?([^：:\n]+)[：:]\s*(\d+\.?\d*\s*(?:克|g|ml|毫升|大碗|中碗|小碗|个|片|只|条))/gi;
+        // 提取食物项 - 匹配格式：- 食材名：重量 或 食材名：重量
+        const foodPattern = /[-•*]?\s*([^：:\n]+)[：:]\s*(\d+\.?\d*\s*(?:克|g|ml|毫升|大碗|中碗|小碗|个|片|只|条|碗))/gi;
         let foodMatch;
         while ((foodMatch = foodPattern.exec(mealText)) !== null) {
-          foods.push({
-            name: foodMatch[1].trim(),
-            amount: foodMatch[2],
-          });
+          const name = foodMatch[1].trim();
+          if (name && name.length > 0 && name.length < 50) {
+            foods.push({
+              name,
+              amount: foodMatch[2],
+            });
+          }
         }
 
-        // 如果没有匹配到，尝试其他格式
+        // 如果没有匹配到，尝试更简单的格式
         if (foods.length === 0) {
           const lines = mealText.split('\n').filter(l => l.trim());
           for (const line of lines) {
-            const cleanLine = line.replace(/^[-•*]\s*/, '');
-            if (cleanLine && !cleanLine.includes('做法') && !cleanLine.includes('步骤')) {
+            const cleanLine = line.replace(/^[-•*\s]*/, '').trim();
+            // 跳过特殊行
+            if (!cleanLine || cleanLine.includes('做法') || cleanLine.includes('步骤') || cleanLine.includes('━')) continue;
+            // 尝试匹配 食材：重量
+            const simpleMatch = cleanLine.match(/^(.+?)[：:]\s*(.+)$/);
+            if (simpleMatch) {
+              foods.push({ name: simpleMatch[1].trim(), amount: simpleMatch[2].trim() });
+            } else if (cleanLine.length > 0 && cleanLine.length < 50) {
               foods.push({ name: cleanLine, amount: '' });
             }
           }
