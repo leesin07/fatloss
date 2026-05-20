@@ -9,9 +9,9 @@ import {
   Copy,
   Check,
   Loader2,
-  Sparkles,
   RefreshCw,
   Home,
+  FileText,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -32,6 +32,7 @@ export default function PlanPage() {
   const [plan, setPlan] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [saved, setSaved] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const planEndRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +41,6 @@ export default function PlanPage() {
     if (stored) {
       const data = JSON.parse(stored);
       setNutrients(data);
-      // 自动开始生成
       generatePlan(data);
     } else {
       router.push('/calculator');
@@ -59,6 +59,7 @@ export default function PlanPage() {
 
     setIsLoading(true);
     setPlan('');
+    setSaved(false);
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -105,6 +106,12 @@ export default function PlanPage() {
           }
         }
       }
+
+      // 生成完成后自动保存方案
+      if (accumulatedPlan && nutrientData) {
+        savePlanToStorage(nutrientData, accumulatedPlan);
+        setSaved(true);
+      }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Error:', error);
@@ -112,6 +119,24 @@ export default function PlanPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const savePlanToStorage = (data: NutrientsData, planContent: string) => {
+    const planRecord = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      weight: data.weight,
+      gender: data.gender,
+      format: data.format,
+      carbs: data.carbs,
+      protein: data.protein,
+      fat: data.fat,
+      plan: planContent,
+    };
+
+    const plans = JSON.parse(localStorage.getItem('mealPlans') || '[]');
+    plans.unshift(planRecord);
+    localStorage.setItem('mealPlans', JSON.stringify(plans.slice(0, 50)));
   };
 
   const handleCopy = async () => {
@@ -142,7 +167,7 @@ export default function PlanPage() {
             <ArrowLeft className="mr-1 h-5 w-5" />
             返回
           </Link>
-          <h1 className="ml-4 text-lg font-semibold">饮食方案</h1>
+          <h1 className="ml-4 text-lg font-semibold">10天饮食方案</h1>
         </div>
       </header>
 
@@ -151,10 +176,17 @@ export default function PlanPage() {
         <Card className="mb-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">每日目标</span>
-              <span className="text-xs text-muted-foreground">
-                {nutrients.weight}kg · {nutrients.format === 'raw' ? '生重' : '熟重'}
-              </span>
+              <span className="text-sm font-medium text-muted-foreground">每日营养目标</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  nutrients.format === 'raw'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+                }`}>
+                  {nutrients.format === 'raw' ? '🥩 生重' : '🍳 熟重'}
+                </span>
+                <span className="text-xs text-muted-foreground">{nutrients.weight}kg</span>
+              </div>
             </div>
             <div className="flex items-center justify-around text-center">
               <div>
@@ -172,6 +204,16 @@ export default function PlanPage() {
                 <div className="text-xs text-muted-foreground">脂肪</div>
               </div>
             </div>
+            {nutrients.format === 'raw' && (
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                ⚠️ 所有食材重量为【生重】，即烹饪前的重量
+              </p>
+            )}
+            {nutrients.format === 'cooked' && (
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                ⚠️ 所有食材重量为【熟重】，即烹饪后可直接称量的重量
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -179,15 +221,22 @@ export default function PlanPage() {
         <Card className="mb-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">
-                {isLoading ? 'AI 生成中...' : '你的饮食方案'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {isLoading ? 'AI 生成中...' : '你的专属方案'}
+                </span>
+                {saved && !isLoading && (
+                  <span className="text-xs text-green-600 flex items-center gap-1">
+                    <Check className="h-3 w-3" /> 已保存
+                  </span>
+                )}
+              </div>
               {plan && !isLoading && (
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => generatePlan()}>
+                  <Button variant="ghost" size="sm" onClick={() => generatePlan()} title="重新生成">
                     <RefreshCw className="h-3 w-3" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={handleCopy}>
+                  <Button variant="ghost" size="sm" onClick={handleCopy} title="复制">
                     {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                   </Button>
                 </div>
@@ -195,9 +244,10 @@ export default function PlanPage() {
             </div>
             <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
               {plan || (
-                <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>AI 正在为你生成方案...</span>
+                <div className="flex flex-col items-center gap-3 text-muted-foreground py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-green-500" />
+                  <span>AI 正在为你生成10天多样化方案...</span>
+                  <span className="text-xs">请稍候，这可能需要十几秒</span>
                 </div>
               )}
             </div>
@@ -207,16 +257,17 @@ export default function PlanPage() {
 
         {/* 底部操作 */}
         {plan && !isLoading && (
-          <div className="flex gap-3">
-            <Link href="/" className="flex-1">
+          <div className="space-y-3">
+            <Link href="/record" className="block">
+              <Button className="w-full h-11 bg-green-500 hover:bg-green-600">
+                <FileText className="mr-2 h-4 w-4" />
+                查看我的记录与历史方案
+              </Button>
+            </Link>
+            <Link href="/" className="block">
               <Button variant="outline" className="w-full h-11">
                 <Home className="mr-2 h-4 w-4" />
                 返回首页
-              </Button>
-            </Link>
-            <Link href="/record" className="flex-1">
-              <Button className="w-full h-11 bg-green-500 hover:bg-green-600">
-                查看我的记录
               </Button>
             </Link>
           </div>
