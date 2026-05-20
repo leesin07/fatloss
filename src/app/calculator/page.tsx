@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -169,22 +168,32 @@ export default function CalculatorPage() {
           {/* 性别 - 可选项 */}
           <div>
             <Label className="text-sm font-medium mb-2 block">性别（可选）</Label>
-            <RadioGroup
-              value={gender || ''}
-              onValueChange={(value) => setGender(value as 'male' | 'female' | null)}
-              className="grid grid-cols-2 gap-3"
-            >
-              <div className="flex items-center justify-center rounded-xl border-2 p-4 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
-                <RadioGroupItem value="male" id="male" className="sr-only" />
-                <Label htmlFor="male" className="cursor-pointer text-lg">👨 男性</Label>
-              </div>
-              <div className="flex items-center justify-center rounded-xl border-2 p-4 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
-                <RadioGroupItem value="female" id="female" className="sr-only" />
-                <Label htmlFor="female" className="cursor-pointer text-lg">👩 女性</Label>
-              </div>
-            </RadioGroup>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setGender(gender === 'male' ? null : 'male')}
+                className={`flex items-center justify-center rounded-xl border-2 p-4 cursor-pointer transition-all text-lg ${
+                  gender === 'male'
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
+                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                👨 男性
+              </button>
+              <button
+                type="button"
+                onClick={() => setGender(gender === 'female' ? null : 'female')}
+                className={`flex items-center justify-center rounded-xl border-2 p-4 cursor-pointer transition-all text-lg ${
+                  gender === 'female'
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
+                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                👩 女性
+              </button>
+            </div>
             <p className="text-xs text-muted-foreground mt-2">
-              女性碳水减少20g、脂肪增加5g
+              女性碳水减少20g、脂肪增加5g；点击已选项可取消
             </p>
           </div>
         </div>
@@ -228,20 +237,30 @@ export default function CalculatorPage() {
             {/* 食材重量格式 */}
             <div>
               <Label className="text-sm font-medium mb-2 block">食材重量格式</Label>
-              <RadioGroup
-                value={format}
-                onValueChange={(value: 'raw' | 'cooked') => setFormat(value)}
-                className="grid grid-cols-2 gap-3"
-              >
-                <div className="flex items-center justify-center rounded-lg border-2 p-3 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
-                  <RadioGroupItem value="raw" id="raw" className="sr-only" />
-                  <Label htmlFor="raw" className="cursor-pointer text-sm">生重（未烹饪）</Label>
-                </div>
-                <div className="flex items-center justify-center rounded-lg border-2 p-3 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
-                  <RadioGroupItem value="cooked" id="cooked" className="sr-only" />
-                  <Label htmlFor="cooked" className="cursor-pointer text-sm">熟重（烹饪后）</Label>
-                </div>
-              </RadioGroup>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormat('raw')}
+                  className={`flex items-center justify-center rounded-lg border-2 p-3 cursor-pointer transition-all text-sm ${
+                    format === 'raw'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
+                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  生重（未烹饪）
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormat('cooked')}
+                  className={`flex items-center justify-center rounded-lg border-2 p-3 cursor-pointer transition-all text-sm ${
+                    format === 'cooked'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
+                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  熟重（烹饪后）
+                </button>
+              </div>
             </div>
 
             {/* 食材偏好 */}
