@@ -18,7 +18,7 @@ export default function Home() {
             减脂计算器
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            科学计算 · AI配餐 · 智能调整
+            AI帮你计算，你只需要坚持
           </p>
         </div>
 
