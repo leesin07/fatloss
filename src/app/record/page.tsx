@@ -15,6 +15,11 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Sun,
+  CloudSun,
+  Moon,
+  Utensils,
+  Flame,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -39,6 +44,13 @@ interface MealPlan {
   protein: number;
   fat: number;
   plan: string;
+}
+
+interface DayPlan {
+  day: number;
+  breakfast: string;
+  lunch: string;
+  dinner: string;
 }
 
 export default function RecordPage() {
@@ -139,6 +151,91 @@ export default function RecordPage() {
   const formatPlanDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return `${date.getMonth() + 1}月${date.getDate()}日`;
+  };
+
+  // 解析方案文本
+  const parsePlan = (text: string): DayPlan[] => {
+    const days: DayPlan[] = [];
+    const dayPattern = /第\s*(\d+)\s*天[：:]/g;
+    let match;
+    
+    const dayPositions: { day: number; start: number }[] = [];
+    while ((match = dayPattern.exec(text)) !== null) {
+      dayPositions.push({ day: parseInt(match[1]), start: match.index });
+    }
+
+    for (let i = 0; i < dayPositions.length; i++) {
+      const current = dayPositions[i];
+      const next = dayPositions[i + 1];
+      const dayContent = text.slice(current.start, next?.start);
+
+      const breakfastMatch = dayContent.match(/早[餐食][：:]\s*([\s\S]*?)(?=午[餐食]|晚[餐食]|$)/);
+      const lunchMatch = dayContent.match(/午[餐食][：:]\s*([\s\S]*?)(?=晚[餐食]|第\s*\d+\s*天|$)/);
+      const dinnerMatch = dayContent.match(/晚[餐食][：:]\s*([\s\S]*?)(?=第\s*\d+\s*天|$)/);
+
+      days.push({
+        day: current.day,
+        breakfast: breakfastMatch?.[1]?.trim() || '',
+        lunch: lunchMatch?.[1]?.trim() || '',
+        dinner: dinnerMatch?.[1]?.trim() || '',
+      });
+    }
+
+    return days;
+  };
+
+  // 渲染单个餐次
+  const MealCard = ({ 
+    type, 
+    content, 
+    icon: Icon, 
+    colorClass 
+  }: { 
+    type: string; 
+    content: string; 
+    icon: React.ElementType;
+    colorClass: string;
+  }) => {
+    if (!content) return null;
+    
+    const lines = content.split('\n').filter(l => l.trim());
+    
+    return (
+      <div className={`rounded-xl p-3 ${colorClass}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <Icon className="h-4 w-4" />
+          <span className="font-medium text-sm">{type}</span>
+        </div>
+        <div className="space-y-2">
+          {lines.map((line, idx) => {
+            const cleanLine = line.replace(/^[•\-\*]\s*/, '');
+            const isTitle = cleanLine.includes('食材') && cleanLine.includes('：');
+            const isRecipe = cleanLine.includes('做法') || cleanLine.includes('步骤');
+            
+            return (
+              <div key={idx} className="text-sm leading-relaxed">
+                {isTitle ? (
+                  <div className="flex items-start gap-2 font-medium text-foreground">
+                    <Utensils className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{cleanLine}</span>
+                  </div>
+                ) : isRecipe ? (
+                  <div className="mt-2 pt-2 border-t border-white/30">
+                    <div className="flex items-center gap-1.5 font-medium text-foreground mb-1">
+                      <Flame className="h-3.5 w-3.5" />
+                      <span>做法</span>
+                    </div>
+                    <p className="text-muted-foreground pl-5">{cleanLine.replace(/^做法[：:]?\s*/, '')}</p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground pl-5">{cleanLine}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const trend = getTrend();
@@ -454,7 +551,7 @@ export default function RecordPage() {
           onClick={() => setSelectedPlan(null)}
         >
           <Card 
-            className="w-full max-w-lg max-h-[85vh] overflow-hidden sm:mx-4 rounded-b-2xl sm:rounded-2xl"
+            className="w-full max-w-lg max-h-[90vh] overflow-hidden sm:mx-4 rounded-b-2xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <CardContent className="p-0">
@@ -491,11 +588,51 @@ export default function RecordPage() {
                 </div>
               </div>
               
-              {/* 方案内容 */}
-              <div className="p-4 overflow-y-auto max-h-[55vh]">
-                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
-                  {selectedPlan.plan}
-                </div>
+              {/* 方案内容 - 卡片式展示 */}
+              <div className="p-4 overflow-y-auto max-h-[60vh] space-y-4">
+                {parsePlan(selectedPlan.plan).map((dayPlan) => (
+                  <div key={dayPlan.day} className="border rounded-xl overflow-hidden">
+                    <div className="px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-b">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">
+                          {dayPlan.day}
+                        </div>
+                        <span className="font-medium text-sm">第 {dayPlan.day} 天</span>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      <MealCard 
+                        type="早餐" 
+                        content={dayPlan.breakfast} 
+                        icon={Sun}
+                        colorClass="bg-amber-50 dark:bg-amber-950/30"
+                      />
+                      <MealCard 
+                        type="午餐" 
+                        content={dayPlan.lunch} 
+                        icon={CloudSun}
+                        colorClass="bg-orange-50 dark:bg-orange-950/30"
+                      />
+                      <MealCard 
+                        type="晚餐" 
+                        content={dayPlan.dinner} 
+                        icon={Moon}
+                        colorClass="bg-indigo-50 dark:bg-indigo-950/30"
+                      />
+                    </div>
+                  </div>
+                ))}
+                
+                {/* 如果解析失败，显示原始内容 */}
+                {parsePlan(selectedPlan.plan).length === 0 && (
+                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                    {selectedPlan.plan}
+                  </div>
+                )}
+                
+                <p className="text-xs text-center text-muted-foreground pt-2">
+                  ⚠️ 所有食材重量为【{selectedPlan.format === 'raw' ? '生重' : '熟重'}】
+                </p>
               </div>
             </CardContent>
           </Card>
