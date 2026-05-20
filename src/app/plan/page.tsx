@@ -54,10 +54,17 @@ export default function PlanPage() {
   useEffect(() => {
     const stored = sessionStorage.getItem('currentNutrients');
     if (stored) {
-      const data = JSON.parse(stored);
-      setNutrients(data);
-      generatePlan(data);
+      try {
+        const data = JSON.parse(stored);
+        console.log('Loaded nutrients data:', data);
+        setNutrients(data);
+        generatePlan(data);
+      } catch (e) {
+        console.error('Failed to parse nutrients data:', e);
+        router.push('/calculator');
+      }
     } else {
+      console.log('No nutrients data found in sessionStorage');
       router.push('/calculator');
     }
   }, [router]);
@@ -348,7 +355,7 @@ export default function PlanPage() {
         )}
 
         {/* 方案列表 - 按天展示 */}
-        {mealPlans.length > 0 && (
+        {mealPlans.length > 0 ? (
           <div className="space-y-3">
             {mealPlans.map((dayPlan) => (
               <Card key={dayPlan.day} className="shadow-sm overflow-hidden">
@@ -399,10 +406,8 @@ export default function PlanPage() {
               </Card>
             ))}
           </div>
-        )}
-
-        {/* 正在生成时显示原始内容 */}
-        {isLoading && plan && mealPlans.length === 0 && (
+        ) : plan && plan.length > 0 ? (
+          /* 解析失败时显示原始内容 */
           <Card className="mb-4 shadow-sm">
             <CardContent className="py-4">
               <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
@@ -410,7 +415,7 @@ export default function PlanPage() {
               </div>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
         <div ref={planEndRef} />
 
