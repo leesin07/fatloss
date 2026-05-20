@@ -20,6 +20,8 @@ import {
   Moon,
   Utensils,
   Flame,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -59,6 +61,7 @@ export default function RecordPage() {
   const [newWeight, setNewWeight] = useState<string>('');
   const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
   const [showAllRecords, setShowAllRecords] = useState<boolean>(false);
+  const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
 
   useEffect(() => {
     loadData();
@@ -100,6 +103,16 @@ export default function RecordPage() {
     if (selectedPlan?.id === id) {
       setSelectedPlan(null);
     }
+  };
+
+  // 重置所有数据
+  const resetAllData = () => {
+    localStorage.removeItem('fatLossRecords');
+    localStorage.removeItem('mealPlans');
+    setRecords([]);
+    setPlans([]);
+    setSelectedPlan(null);
+    setShowResetConfirm(false);
   };
 
   // 计算体重变化趋势
@@ -542,6 +555,20 @@ export default function RecordPage() {
             </p>
           </div>
         )}
+
+        {/* 重置按钮 */}
+        {(records.length > 0 || plans.length > 0) && (
+          <div className="pt-4 pb-8">
+            <Button
+              variant="outline"
+              className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950"
+              onClick={() => setShowResetConfirm(true)}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              重置所有数据
+            </Button>
+          </div>
+        )}
       </main>
 
       {/* 方案详情弹窗 */}
@@ -633,6 +660,50 @@ export default function RecordPage() {
                 <p className="text-xs text-center text-muted-foreground pt-2">
                   ⚠️ 所有食材重量为【{selectedPlan.format === 'raw' ? '生重' : '熟重'}】
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 重置确认对话框 */}
+      {showResetConfirm && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <Card 
+            className="w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">确认重置？</h3>
+                  <p className="text-sm text-muted-foreground">此操作不可恢复</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                将清除所有体重记录和饮食方案数据，确定要继续吗？
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowResetConfirm(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={resetAllData}
+                >
+                  确认重置
+                </Button>
               </div>
             </CardContent>
           </Card>
