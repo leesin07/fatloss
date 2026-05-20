@@ -4,8 +4,9 @@ import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 interface NutrientsData {
   weight: string;
   exercise: string;
-  gender: 'male' | 'female';
-  fastMode: boolean;
+  gender: 'male' | 'female' | null;
+  format: 'raw' | 'cooked';
+  preference: string;
   carbs: number;
   protein: number;
   fat: number;
@@ -13,10 +14,7 @@ interface NutrientsData {
 
 export async function POST(request: NextRequest) {
   try {
-    const data = (await request.json()) as NutrientsData & {
-      preference?: string;
-      format?: 'raw' | 'cooked';
-    };
+    const data = (await request.json()) as NutrientsData;
 
     const { carbs, protein, fat, gender, preference, format = 'raw' } = data;
 
@@ -30,22 +28,30 @@ export async function POST(request: NextRequest) {
 
     const formatDesc =
       format === 'raw'
-        ? '标准生重版：食材重量为生重（未烹饪前的重量）'
-        : '方便熟重版：食材重量为熟重（烹饪后的重量，方便直接称量）';
+        ? '食材重量为生重（未烹饪前的重量）'
+        : '食材重量为熟重（烹饪后的重量，方便直接称量）';
 
-    const systemPrompt = `你是一位专业的营养师和减脂饮食顾问。你的任务是根据用户提供的营养素需求，生成一份科学、生活化的减脂饮食方案。
+    const genderNote = gender === 'female' 
+      ? '用户是女性，注意女性在生理期、激素等方面的特殊性。' 
+      : gender === 'male' 
+        ? '用户是男性。' 
+        : '用户性别未知。';
+
+    const preferenceNote = preference 
+      ? `\n\n**用户的食材偏好/限制：**\n${preference}\n\n请根据这个偏好调整食材，保持营养素总量不变。如果用户说"不吃XX"，请替换成同类食材；如果用户说"只有XX"，尽量用这些食材组合出方案。`
+      : '';
+
+    const systemPrompt = `你是一位专业的营养师和减脂饮食顾问。根据用户提供的营养素需求，生成一份科学、生活化的减脂饮食方案。
 
 ## 核心原则
-1. 所有食材重量必须精准匹配用户提供的营养素需求，误差不超过5g
-2. 使用常见、易购买的食材，不推荐极端饮食（如零碳水、全水煮）
-3. 保持生活化减脂的定位，让普通人也能执行
-4. 语言口语化，像给朋友推荐一样，好理解好执行
-
-## 性别调整
-${gender === 'female' ? '用户是女性，注意女性在生理期、激素等方面的特殊性，食材选择可以更温和。' : '用户是男性，可以适当增加蛋白质丰富的食材。'}
+1. 所有食材重量必须精准匹配营养素需求，误差不超过5g
+2. 使用常见、易购买的食材，不推荐极端饮食
+3. 语言口语化，像给朋友推荐一样，好理解好执行
 
 ## 输出格式
 ${formatDesc}
+
+${genderNote}${preferenceNote}
 
 ## 输出结构（必须严格遵守）
 ### 🌅 早餐
@@ -60,36 +66,27 @@ ${formatDesc}
 - 食材1：XXg（做法提示）
 - 食材2：XXg（做法提示）
 
-### 💡 油脂选择建议
+### 💡 油脂建议
 - 推荐油脂：橄榄油/山茶油等
 - 每日用油量：约XXml
 
-### ⚠️ 钠摄入量提醒
-- 每日盐摄入量建议：不超过5g
-- 注意隐形钠来源：酱油、酱料等
+### ⚠️ 注意事项
+- 每日盐摄入量：不超过5g`;
 
-### 📊 动态调整规则
-- 7-10天后评估体重变化
-- 如果掉秤过快（每周>1.5kg），每日增加10-15g碳水
-- 如果掉秤偏慢（每周<0.5kg），每日减少10-15g碳水`;
+    const userPrompt = `请为我生成减脂饮食方案：
 
-    const userPrompt = `请为我生成一份减脂饮食方案：
-
-**我的营养素需求：**
+**营养素需求：**
 - 碳水化合物：${carbs}g/天
 - 蛋白质：${protein}g/天
 - 脂肪：${fat}g/天
 
-${preference ? `**我的食材偏好/限制：**\n${preference}` : '没有特别的食材偏好'}
-
-请严格按照输出格式生成方案，确保三大营养素总量匹配（误差不超过5g）。`;
+请严格按照输出格式生成，确保三大营养素总量匹配。`;
 
     const messages = [
       { role: 'system' as const, content: systemPrompt },
       { role: 'user' as const, content: userPrompt },
     ];
 
-    // 使用流式输出
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {

@@ -21,8 +21,9 @@ interface WeightRecord {
   date: string;
   weight: number;
   exercise: string;
-  gender: 'male' | 'female';
-  fastMode: boolean;
+  gender: 'male' | 'female' | null;
+  format?: 'raw' | 'cooked';
+  preference?: string;
   carbs: number;
   protein: number;
   fat: number;
@@ -52,7 +53,6 @@ export default function RecordPage() {
     const weightNum = parseFloat(newWeight);
     if (!weightNum || weightNum <= 0) return;
 
-    // 使用最近的营养素设置
     const lastRecord = records[0];
     if (!lastRecord) {
       alert('请先在计算器页面计算营养素');
@@ -65,7 +65,8 @@ export default function RecordPage() {
       weight: weightNum,
       exercise: lastRecord.exercise,
       gender: lastRecord.gender,
-      fastMode: lastRecord.fastMode,
+      format: lastRecord.format,
+      preference: lastRecord.preference,
       carbs: lastRecord.carbs,
       protein: lastRecord.protein,
       fat: lastRecord.fat,
@@ -92,7 +93,6 @@ export default function RecordPage() {
     return `${month}/${day} ${hour}:${minute}`;
   };
 
-  // 计算分析
   const getAnalysis = () => {
     if (records.length < 2) return null;
 
@@ -160,7 +160,7 @@ export default function RecordPage() {
                   className="flex-1 h-11"
                   step="0.1"
                 />
-                <Button onClick={addWeightRecord} disabled={!newWeight} className="h-11 px-4">
+                <Button onClick={addWeightRecord} disabled={!newWeight} className="h-11 px-4 bg-green-500 hover:bg-green-600">
                   <Plus className="h-4 w-4 mr-1" />
                   记录
                 </Button>
@@ -225,7 +225,7 @@ export default function RecordPage() {
 
         {/* 空状态 */}
         {records.length === 0 && (
-          <div className="text-center py-12">
+          <div className="text-center py-16">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
               <TrendingUp className="h-8 w-8 text-gray-400" />
             </div>
@@ -263,7 +263,8 @@ export default function RecordPage() {
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {formatDate(record.date)} · {exerciseLabels[record.exercise] || record.exercise}
+                        {formatDate(record.date)}
+                        {record.exercise && ` · ${exerciseLabels[record.exercise] || record.exercise}`}
                       </div>
                     </div>
                     <div className="flex gap-3 text-center text-sm">
