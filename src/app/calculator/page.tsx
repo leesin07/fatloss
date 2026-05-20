@@ -33,38 +33,30 @@ function calculateNutrients(
   gender: 'male' | 'female',
   fastMode: boolean
 ) {
-  // 基础碳水计算：体重 × 系数
-  // 运动时长影响系数：2-3h=1.5, 4-5h=2, 6-7h=2.5, 8-9h=3
   let carbCoefficient = 1.5;
   if (exerciseHours >= 8) carbCoefficient = 3;
   else if (exerciseHours >= 6) carbCoefficient = 2.5;
   else if (exerciseHours >= 4) carbCoefficient = 2;
 
   let carbs = weight * carbCoefficient;
-
-  // 蛋白质：体重 × 1.5-2g
   const protein = weight * 1.8;
-
-  // 脂肪：体重 × 0.8-1g
   let fat = weight * 0.9;
 
-  // 性别调整
   let carbAdjust = 0;
   let fatAdjust = 0;
+  
   if (gender === 'female') {
-    carbAdjust = -20; // 女性碳水减少20g
-    fatAdjust = 5; // 脂肪增加5g
+    carbAdjust = -20;
+    fatAdjust = 5;
     carbs += carbAdjust;
     fat += fatAdjust;
   }
 
-  // 快速模式调整
   if (fastMode) {
     carbs -= 5;
     carbAdjust -= 5;
   }
 
-  // 确保最小值
   carbs = Math.max(carbs, 50);
   fat = Math.max(fat, 30);
 
@@ -88,34 +80,48 @@ export default function CalculatorPage() {
   const handleCalculate = () => {
     const weightNum = parseFloat(weight);
     if (!weightNum || weightNum <= 0) {
-      alert('请输入有效的体重');
       return;
     }
 
     const exerciseOption = exerciseOptions.find((opt) => opt.value === exercise);
     if (!exerciseOption) {
-      alert('请选择每周运动时长');
       return;
     }
 
     const nutrients = calculateNutrients(weightNum, exerciseOption.hours, gender, fastMode);
     setResult(nutrients);
-  };
-
-  const handleGeneratePlan = () => {
-    if (!result) return;
     
-    // 将计算结果存储到 sessionStorage
-    sessionStorage.setItem('nutrients', JSON.stringify({
+    // 保存到 localStorage
+    const record = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      weight: weightNum,
+      exercise: exerciseOption.value,
+      gender,
+      fastMode,
+      ...nutrients,
+    };
+    
+    const records = JSON.parse(localStorage.getItem('fatLossRecords') || '[]');
+    records.unshift(record);
+    localStorage.setItem('fatLossRecords', JSON.stringify(records.slice(0, 20)));
+    
+    // 同时保存到 sessionStorage 用于方案页面
+    sessionStorage.setItem('currentNutrients', JSON.stringify({
       weight,
       exercise,
       gender,
       fastMode,
-      ...result,
+      ...nutrients,
     }));
-    
+  };
+
+  const handleGeneratePlan = () => {
+    if (!result) return;
     router.push('/plan');
   };
+
+  const isValid = weight && exercise && parseFloat(weight) > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-background">
@@ -126,51 +132,48 @@ export default function CalculatorPage() {
             <ChevronLeft className="mr-1 h-5 w-5" />
             返回
           </Link>
-          <h1 className="ml-4 text-lg font-semibold">个性化摄入量计算器</h1>
+          <h1 className="ml-4 text-lg font-semibold">计算每日摄入量</h1>
         </div>
       </header>
 
       <main className="container mx-auto max-w-lg px-4 py-6">
         {/* 输入表单 */}
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">请填写以下信息</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              只需4步，自动计算你的每日营养素需求
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="pt-6 space-y-5">
             {/* 体重输入 */}
             <div className="space-y-2">
-              <Label htmlFor="weight" className="text-base">
+              <Label htmlFor="weight" className="text-base font-medium">
                 当前体重
               </Label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Input
                   id="weight"
                   type="number"
-                  placeholder="填写你当前初始体重"
+                  placeholder="例如：65"
                   value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
+                  onChange={(e) => {
+                    setWeight(e.target.value);
+                    setResult(null);
+                  }}
                   className="flex-1 h-12 text-lg"
                   min="30"
                   max="300"
                   step="0.1"
                 />
-                <span className="text-muted-foreground">KG</span>
+                <span className="text-muted-foreground text-lg">kg</span>
               </div>
             </div>
 
             {/* 运动时长 */}
             <div className="space-y-2">
-              <Label className="text-base">每周总运动时长</Label>
-              <Select value={exercise} onValueChange={setExercise}>
+              <Label className="text-base font-medium">每周运动时长</Label>
+              <Select value={exercise} onValueChange={(v) => { setExercise(v); setResult(null); }}>
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="选择每周运动时长" />
+                  <SelectValue placeholder="选择运动时长" />
                 </SelectTrigger>
                 <SelectContent>
                   {exerciseOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value} className="text-base">
+                    <SelectItem key={option.value} value={option.value} className="text-base py-3">
                       {option.label}
                     </SelectItem>
                   ))}
@@ -180,51 +183,39 @@ export default function CalculatorPage() {
 
             {/* 性别选择 */}
             <div className="space-y-2">
-              <Label className="text-base">性别选择</Label>
+              <Label className="text-base font-medium">性别</Label>
               <RadioGroup
                 value={gender}
-                onValueChange={(value: 'male' | 'female') => setGender(value)}
-                className="flex gap-4"
+                onValueChange={(value: 'male' | 'female') => { setGender(value); setResult(null); }}
+                className="grid grid-cols-2 gap-3"
               >
-                <div className="flex flex-1 items-center justify-center rounded-lg border-2 p-4 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
+                <div className="flex items-center justify-center rounded-xl border-2 p-4 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
                   <RadioGroupItem value="male" id="male" className="sr-only" />
-                  <Label htmlFor="male" className="cursor-pointer text-base font-medium">
-                    👨 男
-                  </Label>
+                  <Label htmlFor="male" className="cursor-pointer text-lg">👨 男性</Label>
                 </div>
-                <div className="flex flex-1 items-center justify-center rounded-lg border-2 p-4 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
+                <div className="flex items-center justify-center rounded-xl border-2 p-4 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-950">
                   <RadioGroupItem value="female" id="female" className="sr-only" />
-                  <Label htmlFor="female" className="cursor-pointer text-base font-medium">
-                    👩 女
-                  </Label>
+                  <Label htmlFor="female" className="cursor-pointer text-lg">👩 女性</Label>
                 </div>
               </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                自动触发性别系数修正，不用手动计算
-              </p>
             </div>
 
             {/* 目标调整 */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-base">希望掉秤速度稍快</Label>
-                <Switch
-                  checked={fastMode}
-                  onCheckedChange={setFastMode}
-                />
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-base font-medium">加速模式</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">碳水减少5g/天</p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                默认「偏稳」，开启后碳水减少5g，适合不着急的新手
-              </p>
+              <Switch checked={fastMode} onCheckedChange={(v) => { setFastMode(v); setResult(null); }} />
             </div>
 
             {/* 计算按钮 */}
             <Button
               onClick={handleCalculate}
-              className="w-full h-12 text-base font-semibold bg-green-500 hover:bg-green-600"
-              size="lg"
+              disabled={!isValid}
+              className="w-full h-12 text-base font-semibold bg-green-500 hover:bg-green-600 disabled:opacity-50"
             >
-              开始计算
+              计算营养素
             </Button>
           </CardContent>
         </Card>
@@ -232,55 +223,47 @@ export default function CalculatorPage() {
         {/* 计算结果 */}
         {result && (
           <Card className="mb-6 border-green-200 dark:border-green-800">
-            <CardHeader className="bg-green-50 dark:bg-green-950">
+            <CardHeader className="bg-green-50 dark:bg-green-950 rounded-t-lg">
               <CardTitle className="text-base text-green-700 dark:text-green-400">
-                计算结果
+                每日营养素目标
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               {/* 三大营养素 */}
-              <div className="mb-6 grid grid-cols-3 gap-3">
-                <div className="rounded-lg bg-orange-50 p-4 text-center dark:bg-orange-950">
-                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                    {result.carbs}g
+              <div className="mb-5 grid grid-cols-3 gap-3">
+                <div className="rounded-xl bg-orange-50 p-4 text-center dark:bg-orange-950">
+                  <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                    {result.carbs}
                   </div>
-                  <div className="text-sm text-orange-700 dark:text-orange-300">碳水化合物</div>
+                  <div className="text-sm text-orange-700 dark:text-orange-300 mt-1">碳水 (g)</div>
                 </div>
-                <div className="rounded-lg bg-red-50 p-4 text-center dark:bg-red-950">
-                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    {result.protein}g
+                <div className="rounded-xl bg-red-50 p-4 text-center dark:bg-red-950">
+                  <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                    {result.protein}
                   </div>
-                  <div className="text-sm text-red-700 dark:text-red-300">蛋白质</div>
+                  <div className="text-sm text-red-700 dark:text-red-300 mt-1">蛋白质 (g)</div>
                 </div>
-                <div className="rounded-lg bg-yellow-50 p-4 text-center dark:bg-yellow-950">
-                  <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                    {result.fat}g
+                <div className="rounded-xl bg-yellow-50 p-4 text-center dark:bg-yellow-950">
+                  <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {result.fat}
                   </div>
-                  <div className="text-sm text-yellow-700 dark:text-yellow-300">脂肪</div>
+                  <div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">脂肪 (g)</div>
                 </div>
               </div>
 
               {/* 适配说明 */}
-              <div className="mb-6 rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-                <div className="flex items-start gap-2">
-                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-700 dark:text-blue-300">
-                    {gender === 'female' && (
-                      <>
-                        已按性别要求调整：碳水减少{Math.abs(result.carbAdjust)}g、脂肪增加{result.fatAdjust}g
-                        <br />
-                      </>
-                    )}
-                    {fastMode && (
-                      <>
-                        已开启快速模式：碳水额外减少5g
-                        <br />
-                      </>
-                    )}
-                    运动时长影响碳水系数，运动越多碳水需求越高
+              {(gender === 'female' || fastMode) && (
+                <div className="mb-5 rounded-xl bg-blue-50 p-3 dark:bg-blue-950">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      {gender === 'female' && `已按女性调整：碳水${result.carbAdjust}g、脂肪+${result.fatAdjust}g`}
+                      {gender === 'female' && fastMode && '；'}
+                      {fastMode && '加速模式：碳水额外-5g'}
+                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* 生成方案按钮 */}
               <Button
@@ -289,7 +272,7 @@ export default function CalculatorPage() {
                 size="lg"
               >
                 <Sparkles className="mr-2 h-5 w-5" />
-                生成专属饮食方案
+                生成饮食方案
               </Button>
             </CardContent>
           </Card>
